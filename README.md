@@ -1,2 +1,3 @@
 # MKwAD_Project
-Confidential Analysis of Medical Data with homomorphic encryption
+### Poufna analiza danych medycznych 
+Implementacja systemu, w którym szpital może zlecić zewnętrznemu serwerowi obliczenie wskaźników statystycznych (średnia, mediana etc. ) pewnych danych medycznych o pacjentach — bez ujawniania surowych danych.
