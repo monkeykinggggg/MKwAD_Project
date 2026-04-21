@@ -20,7 +20,9 @@ Biblioteka do szyfrowania homorficznego:
 https://pyfhel.readthedocs.io/en/latest/_autoexamples/index.html
 
 Linki do przykładowych projektów z zastosowaniem szyfrowania:  
-Tu można wejść w Use Cases i Demos:
 https://github.com/jonaschn/awesome-he
+
+Tu można wejść w Use Cases i Demos:
+https://fhe.org/resources/#libraries
 
 
