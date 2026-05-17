@@ -39,3 +39,6 @@ Biblioteki do zastosowania szyfrowania:
 
 
 
+Pytania na zajęcia:
+1. Czy zamykamy się z linearnych kalkulacjach(dodawanie, mnożenie), czyli wyliczanie średnich, odchylenia, bez porównywania danych jak np. mediana.
+2. Czy potrzebne nam są dane pacjentów do wygenerowania, czy wystarczy nam po prostu id pacjenta z wynikami(czyli czy robimy jedną, czy dwie tabelki)
