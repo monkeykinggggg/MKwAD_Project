@@ -1,0 +1,10 @@
+[project]
+name = "medical-frontend"
+version = "0.1.0"
+description = "Streamlit frontend for the medical FHE demo"
+requires-python = ">=3.13"
+dependencies = [
+    "pandas>=2.2.3",
+    "requests>=2.34.2",
+    "streamlit>=1.45.0",
+]
