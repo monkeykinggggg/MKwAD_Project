@@ -6,8 +6,9 @@ import os
 import csv
 from contextlib import asynccontextmanager
 from typing import List
+import requests
 
-from sqlalchemy.testing.pickleable import User
+COMPUTATIONAL_URL = "http://localhost:8002"
 
 engine = create_engine('sqlite:///medical.db', connect_args={"check_same_thread": False})
 # database session - preventing it from reloading every flush and commit
@@ -144,7 +145,63 @@ def get_patient(patient_id:int, db:Session = Depends(get_db)):
 
 @app.post("/patients", response_model=PatientResultsReponse)
 def create_patient(patient:PatientResultsReponse, db:Session = Depends(get_db)):
-    patient = db.query(PatientResults).filter(PatientResults.patient_id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
-    return patient
+    new_patient = PatientResults(**patient.dict())
+    db.add(new_patient)
+    db.commit()
+    db.refresh(new_patient)
+    return new_patient
+
+@app.get("/sayhello")
+def say_hello():
+    res = requests.get(COMPUTATIONAL_URL)
+    if res.status_code == 200:
+        print("Communication with computational server initialized")
+        return {
+            "status": "Success",
+            "message": res.json(),
+        }
+    else:
+        return {
+            "status": "Failed",
+            "message": "Failed to reach computational server",
+        }
+
+@app.get("/analyze/{metric}/mean")
+def analyze_metric(metric: str, db: Session = Depends(get_db)):
+    valid_metrics = [
+        "age", "sex", "chest_pain", "resting_blood", "serum_cholestrol",
+        "fasting_blood_sugar", "electrocardiography", "maximum_heart_rate",
+        "angina", "oldpeak_ST", "slope_ST", "major_vessel_number", "thal", "target"
+    ]
+    if metric not in valid_metrics:
+        raise HTTPException(status_code=400, detail=f"Invalid metric. Choose from: {valid_metrics}")
+    results = db.query(getattr(PatientResults, metric)).all()
+
+    raw_data = [row[0] for row in results if row[0] is not None]
+
+    if not raw_data:
+        raise HTTPException(status_code=404, detail="No data found in the database.")
+
+    encrypted_data = raw_data
+    try:
+        print(f"Sending {len(encrypted_data)} records to the computational server...")
+        response = requests.post(
+            f"{COMPUTATIONAL_URL}/mean",
+            json={"data": encrypted_data}
+        )
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Failed to contact computational server: {str(e)}")
+
+    cloud_result = response.json().get("result")
+
+    final_plaintext_answer = cloud_result
+
+    return {
+        "status": "Success",
+        "metric_analyzed": metric,
+        "patients_counted": len(raw_data),
+        "mean": final_plaintext_answer
+    }
+
+
