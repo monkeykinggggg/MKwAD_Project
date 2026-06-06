@@ -16,7 +16,9 @@ https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset
 
 ## Plan działania:
 1. Sprawdzenie danych, przeczyszczenie
+2. Realizacja systemu rozproszonego (dwa serery backend + front medyczny): Architektura + implementacja
 2. Pierwsze testy enkrypcji lokalnie
+2. Enkrypcja działająca w pełni w całym systemie
 3. Zrealizowanie systemu medycznego, w którym możemy dodawać obserwacje do tabeli oraz wysyłać zapytania z odpowiednimi filtrami (np. sprawdzamy średnią danej metryki tylko wśród osób chorych)
 4. Realizacja serwisu obliczeniowego, komunikacja z serwisem medycznym i zwracanie odpowiednich wyników
 5. Testy integracyjne
@@ -28,6 +30,10 @@ React
 Docker (?)
 
 
+## Enkrypcja
+Użyty został schemat CKKS do arytmetyki zmiennoprzecinkowej. 
+
+
 ## Źródła:  
 Teoria:
 - https://courses.csail.mit.edu/6.857/2022/projects/Facen-Fang-Shepard-Viera.pdf
@@ -36,9 +42,3 @@ Teoria:
 
 Biblioteki do zastosowania szyfrowania:  
 - https://github.com/jonaschn/awesome-he
-
-
-
-Pytania na zajęcia:
-1. Czy zamykamy się z linearnych kalkulacjach(dodawanie, mnożenie), czyli wyliczanie średnich, odchylenia, bez porównywania danych jak np. mediana.
-2. Czy potrzebne nam są dane pacjentów do wygenerowania, czy wystarczy nam po prostu id pacjenta z wynikami(czyli czy robimy jedną, czy dwie tabelki)

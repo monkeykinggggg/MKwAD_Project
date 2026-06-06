@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException
+import base64
+import math
+from fastapi import FastAPI, Depends, HTTPException, Request
 from sqlalchemy import create_engine, Column, Integer, Float
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from pydantic import BaseModel, ConfigDict
@@ -7,6 +9,7 @@ import csv
 from contextlib import asynccontextmanager
 from typing import List
 import requests
+import tenseal as ts
 
 COMPUTATIONAL_URL = "http://localhost:8002"
 
@@ -14,6 +17,17 @@ engine = create_engine('sqlite:///medical.db', connect_args={"check_same_thread"
 # database session - preventing it from reloading every flush and commit
 SessionLocal = sessionmaker(autocommit = False, autoflush = False, bind=engine)
 Base = declarative_base()
+
+
+he_context = ts.context(
+    ts.SCHEME_TYPE.CKKS,
+    poly_modulus_degree=8192,
+    coeff_mod_bit_sizes=[60, 40, 40, 60]
+)
+he_context.global_scale = 2**40
+# Galois keys are required for the sum() operation on vectors
+he_context.generate_galois_keys()
+
 
 # database structure
 class PatientResults(Base):
@@ -97,6 +111,19 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed_database_from_csv(db)
+        
+        # adding logic for sharing HE context with computational server
+        print("Generating and sharing public HE context...")
+        public_context = he_context.copy()
+        public_context.make_context_public() # Strips the secret key!
+        pub_b64 = base64.b64encode(public_context.serialize()).decode('utf-8')
+        requests.post(
+            f"{COMPUTATIONAL_URL}/init-context", 
+            json={"context": pub_b64}
+        )
+        print("Public context successfully shared with computational server.")
+    except requests.exceptions.RequestException as e:
+        print(f"WARNING: Could not connect to computational server: {e}")    
     finally:
         db.close()
     # The 'yield' pauses this function. FastAPI takes over here
@@ -166,42 +193,70 @@ def say_hello():
             "message": "Failed to reach computational server",
         }
 
-@app.get("/analyze/{metric}/mean")
-def analyze_metric(metric: str, db: Session = Depends(get_db)):
-    valid_metrics = [
-        "age", "sex", "chest_pain", "resting_blood", "serum_cholestrol",
-        "fasting_blood_sugar", "electrocardiography", "maximum_heart_rate",
-        "angina", "oldpeak_ST", "slope_ST", "major_vessel_number", "thal", "target"
-    ]
-    if metric not in valid_metrics:
-        raise HTTPException(status_code=400, detail=f"Invalid metric. Choose from: {valid_metrics}")
-    results = db.query(getattr(PatientResults, metric)).all()
-
-    raw_data = [row[0] for row in results if row[0] is not None]
-
+@app.get("/analyze/{metric}/{operation}")
+def analyze_metric(metric: str, operation: str, request: Request, db: Session = Depends(get_db)):
+    valid_columns = PatientResults.__table__.columns.keys()
+    valid_operations = ["mean", "variance", "std_dev"]
+    
+    if metric not in valid_columns:
+        raise HTTPException(status_code=400, detail=f"Invalid metric.")
+    if operation not in valid_operations:
+        raise HTTPException(status_code=400, detail=f"Invalid operation. Choose 'mean', 'variance', or 'std_dev'.")
+        
+    query = db.query(getattr(PatientResults, metric))
+    filters_applied = {}
+    for key, value in request.query_params.items():
+        if not value.strip():
+            continue
+        try:
+            val_float = float(value)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Filter value for '{key}' must be a number.")
+        if key.endswith('_min'):
+            col_name = key[:-4]
+            if col_name in valid_columns:
+                query = query.filter(getattr(PatientResults, col_name) >= val_float)
+                filters_applied[key] = val_float
+                
+        elif key.endswith('_max'):
+            col_name = key[:-4]
+            if col_name in valid_columns:
+                query = query.filter(getattr(PatientResults, col_name) <= val_float)
+                filters_applied[key] = val_float
+                
+        elif key in valid_columns:
+            query = query.filter(getattr(PatientResults, key) == val_float)
+            filters_applied[key] = val_float
+    results = query.all()
+    raw_data = [float(row[0]) for row in results if row[0] is not None]
     if not raw_data:
-        raise HTTPException(status_code=404, detail="No data found in the database.")
+        raise HTTPException(status_code=404, detail="No data found.")
 
-    encrypted_data = raw_data
+    count = len(raw_data)
+    enc_vector = ts.ckks_vector(he_context, raw_data)
+    ser_data = base64.b64encode(enc_vector.serialize()).decode('utf-8')
+
     try:
-        print(f"Sending {len(encrypted_data)} records to the computational server...")
+        operation_endpoint = operation if operation != "std_dev" else "variance"
         response = requests.post(
-            f"{COMPUTATIONAL_URL}/mean",
-            json={"data": encrypted_data}
+            f"{COMPUTATIONAL_URL}/{operation_endpoint}",
+            json={"data": ser_data, "count": count}
         )
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to contact computational server: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Computational server error: {e}")
 
-    cloud_result = response.json().get("result")
+    result_b64 = response.json().get("result")
+    result_bytes = base64.b64decode(result_b64)
+    result_enc = ts.ckks_vector_from(he_context, result_bytes)
+    decrypted_result = result_enc.decrypt()
+    final_value = decrypted_result[0]
 
-    final_plaintext_answer = cloud_result
-
-    return {
+    response_payload = {
         "status": "Success",
         "metric_analyzed": metric,
-        "patients_counted": len(raw_data),
-        "mean": final_plaintext_answer
+        "rows_counted": count,
+        "filters_applied": filters_applied,
+        f"result_{operation}": final_value if operation != "std_dev" else math.sqrt(final_value)
     }
-
-
+    return response_payload
