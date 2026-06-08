@@ -26,9 +26,10 @@ Database description:
 Analysis examples:
 https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset/code
 
-### To send analytics data to computational server make a request:
+## To send analytics data to computational server make one of requests available:
+### Request for mean, variance, std_dev calculations
 ```bash
-POST /analyze/{metric}/{operation}
+GET /analyze/{metric}/{operation}
 ```
 Where:
 metric -> choose one from: ["mean", "variance", "std_dev"]
@@ -63,3 +64,12 @@ So for parameters we have options:
 - `column_name` = specific_val (we filter for rows that have column_name== specific_val)
 - `column_name_min` = specific_val (we filter for rows that have column_name>= specific_val)
 - `column_name_max` = specific_val(we filter for rows that have column_name<= specific_val )
+
+### Request for covariance calculations between two features
+```bash
+GET /covariance/{metric_x}/{metric_y}
+```
+Where:
+metric_x, metric_y -> choose one from database columns
+
+And then the endpoint can be followed by filtering parameters same as the analytical endpoint.
