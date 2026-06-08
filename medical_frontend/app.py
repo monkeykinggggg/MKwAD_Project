@@ -305,3 +305,134 @@ with tab_dodaj:
                     st.error(f"Błąd serwera: {res.status_code}")
             except Exception as e:
                 st.error(f"Błąd połączenia: {e}")
+#############################################################################################################################
+with tab_statystyki:
+    
+    row1_col1, row1_col2 = st.columns(2)
+
+    filter_state = {
+    "min_value": None,
+    "max_value": None,
+    "exact_value": None
+}
+    params = {}
+
+    RANGES_CONFIG = {
+        "age": {"min": 0.0, "max": 120.0, "step": 1.0},
+        "sex": {"min": 0.0, "max": 1.0, "step": 1.0},
+        "chest_pain": {"min": 0.0, "max": 3.0, "step": 1.0},
+        "resting_blood": {"min": 50.0, "max": 250.0, "step": 1.0},
+        "serum_cholesterol": {"min": 100.0, "max": 600.0, "step": 1.0},
+        "fasting_blood_sugar": {"min": 0.0, "max": 1.0, "step": 1.0},
+        "electrocardiography": {"min": 0.0, "max": 2.0, "step": 1.0},
+        "maximum_heart_rate": {"min": 50.0, "max": 250.0, "step": 1.0},
+        "angina": {"min": 0.0, "max": 1.0, "step": 1.0},
+        "oldpeak_ST": {"min": 0.0, "max": 10.0, "step": 0.1},
+        "slope_ST": {"min": 0.0, "max": 2.0, "step": 1.0},
+        "major_vessel_number": {"min": 0.0, "max": 4.0, "step": 1.0},
+        "thal": {"min": 0.0, "max": 3.0, "step": 1.0},
+        "target": {"min": 0.0, "max": 1.0, "step": 1.0},
+    }
+    all_columns = list(RANGES_CONFIG.keys())
+
+
+    st.header ("📊 Statystyki Pacjentów")
+    with row1_col1:
+        metric = st.selectbox(
+            "Wybierz metrykę do analizy:",
+            options=all_columns,
+            format_func=lambda x: f"{x}"
+        )
+    with row1_col2:
+        operation = st.selectbox(
+            "Wybierz operację matematyczną:",
+            options=["mean", "variance", "std_dev"],
+            format_func=lambda x: {
+                "mean": "Średnia (mean)",
+                "variance": "Wariancja (variance)",
+                "std_dev": "Odchylenie standardowe (std_dev)"
+            }[x]
+        )
+        url_filter=""
+    
+        st.write("Wybierz zakres wartości do analizy lub konkretne wartości dla metryk")
+
+    def render_continuous_filter(label):
+        st.markdown(f" **{label}**")
+        c_ch1, c_ch2 = st.columns([ 1.5, 1.5])
+        
+        with c_ch1:
+            use_range = st.checkbox("Zakres Min/Max", key=f"{label}_ch_rng", value=False)
+        with c_ch2:
+            use_exact = st.checkbox("Dokładna wartość", key=f"{label}_ch_ex", value=False, disabled=use_range)
+
+
+        ex_input, min_val_input, max_val_input = None, None, None
+        v_min = RANGES_CONFIG[label]["min"]
+        v_max = RANGES_CONFIG[label]["max"]
+        v_step = RANGES_CONFIG[label]["step"]
+        
+        if use_range:
+            c_min, c_max = st.columns(2)
+            with c_min:
+                min_val_input = st.number_input(f"Od:", min_value=v_min, max_value=v_max, value=v_min, 
+                    step=v_step, key=f"{label}_in_min")
+            with c_max:
+                max_val_input = st.number_input( f"Do:", min_value=v_min, max_value=v_max, value=v_max,  step=v_step, key=f"{label}_in_max" )
+            if min_val_input == v_min and max_val_input == v_max:
+                min_val_input = None
+                max_val_input = None
+        elif use_exact: 
+            ex = st.number_input(f"Wartość {label}", min_value=v_min, max_value=v_max, value=v_min,  key=f"{label}_in", label_visibility="collapsed")
+            if ex != v_min:
+                ex_input = ex
+
+        return{"min_value": min_val_input,"max_value": max_val_input, "exact_value": ex_input}
+
+    col1, col2 = st.columns(2)
+    with col1:
+
+        for col in all_columns[:len(all_columns)//2]:
+            res=render_continuous_filter(label=col, )
+            if res["min_value"] is not None:
+                url_filter += f"{col}_min={res['min_value']}&"
+            if res["max_value"] is not None:
+                url_filter += f"{col}_max={res['max_value']}&"
+            if res["exact_value"] is not None:
+                url_filter += f"{col}={res['exact_value']}&"
+                
+
+    with col2:
+        for col in all_columns[len(all_columns)//2:]:
+            res=render_continuous_filter(label=col, )
+            if res["min_value"] is not None:
+                url_filter += f"{col}_min={res['min_value']}&"
+            if res["max_value"] is not None:
+                url_filter += f"{col}_max={res['max_value']}&"
+            if res["exact_value"] is not None:
+                url_filter += f"{col}={res['exact_value']}&"
+    
+    url_filter = url_filter.rstrip("&")  
+
+    st.divider()
+    target_url = f"{BACKEND_URL}/analyze/{metric}/{operation}?{url_filter}"
+    if st.button("Oblicz statystykę"):
+        try:
+            response = requests.get(target_url, params=params)
+            if response.status_code == 200:
+                response = response.json()
+                result_key = f"result_{operation}"
+                result = response.get(result_key, None)
+                rows_counted = response.get("rows_counted", 0)
+
+                if result is not None:
+                    st.success(f"### Wynik ({operation}) dla metryki **{metric}**: **{result:.2f}**")
+                    st.info(f" Analiza została przeprowadzona na grupie **{rows_counted}** pacjentów spełniających kryteria.")
+                else:
+                    st.error(f"Nie można znaleźć klucza '{result_key}' w odpowiedzi serwera.")
+                    st.json(response)
+            else:
+                st.error(f"Błąd serwera: {response.status_code}")
+        except Exception as e:
+            st.error(f"Błąd połączenia: {e}")
+
