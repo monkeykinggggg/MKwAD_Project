@@ -1,39 +1,52 @@
-import pytest
 import tenseal as ts
-from utils import compute_he_mean, compute_he_variance
+from utils import compute_he_mean, compute_he_variance, compute_he_covariance
 import numpy as np
+import unittest
 
-@pytest.fixture(scope="module")
-def he_context():
-    context = ts.context(
-        ts.SCHEME_TYPE.CKKS,
-        poly_modulus_degree=8192,
-        coeff_mod_bit_sizes=[60, 40, 40, 60]
-    )
-    context.global_scale = 2**40
-    context.generate_galois_keys()
-    return context
+class TestHEComputations(unittest.TestCase):
+    
+    @classmethod
+    def setUpClass(self):
+        self.he_context = ts.context(
+            ts.SCHEME_TYPE.CKKS,
+            poly_modulus_degree=8192,
+            coeff_mod_bit_sizes=[60, 40, 40, 60]
+        )
+        self.he_context.global_scale = 2**40
+        self.he_context.generate_galois_keys()
 
-def test_compute_he_mean(he_context):
-    raw_data = [20.0, 30.0, 40.0, 50.0]
-    count = len(raw_data)
-    expected_mean = np.mean(raw_data)
-    
-    enc_vector = ts.ckks_vector(he_context, raw_data)
-    
-    enc_result = compute_he_mean(enc_vector, count)
-    decrypted_result = enc_result.decrypt()[0]
-    
-    assert pytest.approx(decrypted_result, rel=1e-3) == expected_mean
+    def test_compute_he_mean(self):
+        message = [2,3,4,5,2,9]
+        count = len(message)
+        expected_mean = sum(message) / count
+        
+        c = ts.ckks_vector(self.he_context, message)
+        encrypted_mean = compute_he_mean(c, count)
+        decrypted_result = encrypted_mean.decrypt()[0]
+        self.assertAlmostEqual(decrypted_result, expected_mean, places=3)
 
-def test_compute_he_variance(he_context):
-    raw_data = [120.0, 130.0, 140.0, 150.0]
-    count = len(raw_data)
-    expected_variance = np.var(raw_data) # Population variance
-    
-    enc_vector = ts.ckks_vector(he_context, raw_data)
-    
-    enc_result = compute_he_variance(enc_vector, count)
-    decrypted_result = enc_result.decrypt()[0]
-    
-    assert pytest.approx(decrypted_result, rel=1e-3) == expected_variance
+    def test_compute_he_variance(self):
+        message = [120, 70, 90, 40]
+        count = len(message)
+        expected_variance = np.var(message)
+        c = ts.ckks_vector(self.he_context, message)
+        
+        enc_result = compute_he_variance(c, count)
+        decrypted_result = enc_result.decrypt()[0]
+        self.assertAlmostEqual(decrypted_result, expected_variance, places=3)
+        
+    def test_compute_he_covariance(self):
+        x = [1, 2, 3, 4]
+        y = [2, 3, 4, 5]
+        count = len(x)
+        cov_matrix = np.cov(x, y, ddof=0) 
+        expected_covariance = cov_matrix[0][1]
+        
+        enc_x = ts.ckks_vector(self.he_context, x)
+        enc_y = ts.ckks_vector(self.he_context, y)
+        enc_covariance = compute_he_covariance(enc_x, enc_y, count)
+        decrypted_covariance = enc_covariance.decrypt()[0]
+        self.assertAlmostEqual(decrypted_covariance, expected_covariance, places=3)
+
+if __name__ == '__main__':
+    unittest.main()

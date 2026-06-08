@@ -16,3 +16,12 @@ def compute_he_variance(enc_vector: ts.CKKSVector, count: int) -> ts.CKKSVector:
     # Variance
     variance_enc = mean_of_squares - square_of_mean
     return variance_enc
+
+def compute_he_covariance(enc_x: ts.CKKSVector, enc_y: ts.CKKSVector, count: int) -> ts.CKKSVector:
+    # E[X*Y] (Element-wise multiplication, then sum, then average)
+    mean_xy = (enc_x * enc_y).sum() * (1 / count)
+    
+    # E[X] * E[Y]
+    mean_x = enc_x.sum() * (1 / count)
+    mean_y = enc_y.sum() * (1 / count)
+    return mean_xy - (mean_x * mean_y)

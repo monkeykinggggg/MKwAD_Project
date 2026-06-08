@@ -260,3 +260,86 @@ def analyze_metric(metric: str, operation: str, request: Request, db: Session = 
         f"result_{operation}": final_value if operation != "std_dev" else math.sqrt(final_value)
     }
     return response_payload
+
+
+@app.get("/covariance/{metric_x}/{metric_y}")
+def analyze_bivariate(
+    metric_x: str, 
+    metric_y: str, 
+    request: Request, 
+    db: Session = Depends(get_db)
+):
+    valid_columns = PatientResults.__table__.columns.keys()
+    
+    if metric_x not in valid_columns or metric_y not in valid_columns:
+        raise HTTPException(status_code=400, detail="Invalid metric names.")
+        
+    query = db.query(getattr(PatientResults, metric_x), getattr(PatientResults, metric_y))
+    filters_applied = {}
+    for key, value in request.query_params.items():
+        if not value.strip():
+            continue
+        try:
+            val_float = float(value)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Filter value for '{key}' must be a number.")
+            
+        if key.endswith('_min'):
+            col_name = key[:-4]
+            if col_name in valid_columns:
+                query = query.filter(getattr(PatientResults, col_name) >= val_float)
+                filters_applied[key] = val_float
+                
+        elif key.endswith('_max'):
+            col_name = key[:-4]
+            if col_name in valid_columns:
+                query = query.filter(getattr(PatientResults, col_name) <= val_float)
+                filters_applied[key] = val_float
+                
+        elif key in valid_columns:
+            query = query.filter(getattr(PatientResults, key) == val_float)
+            filters_applied[key] = val_float
+
+    results = query.all()
+    clean_data = [
+        (float(row[0]), float(row[1])) 
+        for row in results 
+        if row[0] is not None and row[1] is not None
+    ]
+    
+    count = len(clean_data)
+    if count < 3: 
+        raise HTTPException(
+            status_code=403, 
+            detail="Privacy threshold not met. Filter too restrictive (returns fewer than 3 patients)."
+        )
+
+    raw_x = [row[0] for row in clean_data]
+    raw_y = [row[1] for row in clean_data]
+
+    enc_x = ts.ckks_vector(he_context, raw_x)
+    enc_y = ts.ckks_vector(he_context, raw_y)
+    ser_x = base64.b64encode(enc_x.serialize()).decode('utf-8')
+    ser_y = base64.b64encode(enc_y.serialize()).decode('utf-8')
+
+    try:
+        response = requests.post(
+            f"{COMPUTATIONAL_URL}/covariance",
+            json={"data_x": ser_x, "data_y": ser_y, "count": count}
+        )
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Computational server error: {e}")
+
+    result_b64 = response.json().get("result")
+    result_bytes = base64.b64decode(result_b64)
+    result_enc = ts.ckks_vector_from(he_context, result_bytes)
+    covariance_val = result_enc.decrypt()[0]
+    return {
+        "status": "Success",
+        "metric_x": metric_x,
+        "metric_y": metric_y,
+        "rows_counted": count,
+        "filters_applied": filters_applied,
+        "result_covariance": covariance_val
+    }

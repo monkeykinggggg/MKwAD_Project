@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import tenseal as ts
 import base64
-from utils import compute_he_mean, compute_he_variance
+from utils import compute_he_mean, compute_he_variance, compute_he_covariance
 
 app = FastAPI(title="Computational Server")
 
@@ -13,6 +13,11 @@ class ContextPayload(BaseModel):
 
 class EncryptedPayload(BaseModel):
     data: str
+    count: int
+    
+class BiEncryptedPayload(BaseModel):
+    data_x: str
+    data_y: str
     count: int
 
 @app.get("/")
@@ -55,5 +60,19 @@ def compute_variance_endpoint(payload: EncryptedPayload):
     enc_vector = ts.ckks_vector_from(context, vector_bytes)
     result_enc = compute_he_variance(enc_vector, payload.count)
     
+    result_b64 = base64.b64encode(result_enc.serialize()).decode('utf-8')
+    return {"result": result_b64}
+
+
+@app.post("/covariance")
+def compute_covariance_endpoint(payload: BiEncryptedPayload):
+    if 'public_context' not in he_context_storage:
+        raise HTTPException(status_code=400, detail="HE Context not initialized.")
+    
+    context = he_context_storage['public_context']
+    vector_x = ts.ckks_vector_from(context, base64.b64decode(payload.data_x))
+    vector_y = ts.ckks_vector_from(context, base64.b64decode(payload.data_y))
+    result_enc = compute_he_covariance(vector_x, vector_y, payload.count)
+
     result_b64 = base64.b64encode(result_enc.serialize()).decode('utf-8')
     return {"result": result_b64}
