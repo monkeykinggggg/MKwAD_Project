@@ -36,9 +36,9 @@ The system uses the CKKS Fully Homomorphic Encryption (FHE) scheme implemented w
 | Data inspection and cleaning | DONE |
 | Implementation of the distributed system (two backend servers + medical frontend): architecture and implementation |  DONE |
 | Initial local encryption tests |  DONE |
-| Fully functional encryption across the entire system | ✅ DONE |
-| Development of the medical system, including: <br> • adding observations to the database <br> • submitting synamic client-side filtering queries allowing to construct complex, multi-variable queries (e.g., calculating the average value of a metric only for patients diagnosed with heart disease) | ✅ DONE |
-| Development of the computation service, communication with the medical service, and returning the appropriate results | ✅ DONE |
+| Fully functional encryption across the entire system | DONE |
+| Development of the medical system, including: <br> • adding observations to the database <br> • submitting synamic client-side filtering queries allowing to construct complex, multi-variable queries (e.g., calculating the average value of a metric only for patients diagnosed with heart disease) | DONE |
+| Development of the computation service, communication with the medical service, and returning the appropriate results | DONE |
 
 ## Running the Project
 To check on more detailed run isntructions from side of each server please refer to their README.md files.
