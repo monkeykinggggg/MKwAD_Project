@@ -338,21 +338,31 @@ with tab_statystyki:
 
     st.header ("📊 Statystyki Pacjentów")
     with row1_col1:
+        operation = st.selectbox(
+            "Wybierz operację matematyczną:",
+            options=["mean", "variance", "std_dev", "covariance"],
+            format_func=lambda x: {
+                "mean": "Średnia (mean)",
+                "variance": "Wariancja (variance)",
+                "std_dev": "Odchylenie standardowe (std_dev)",
+                "covariance": "Kowariancja (covariance)"
+            }[x]
+        )
+
+    with row1_col2:
         metric = st.selectbox(
             "Wybierz metrykę do analizy:",
             options=all_columns,
             format_func=lambda x: f"{x}"
         )
-    with row1_col2:
-        operation = st.selectbox(
-            "Wybierz operację matematyczną:",
-            options=["mean", "variance", "std_dev"],
-            format_func=lambda x: {
-                "mean": "Średnia (mean)",
-                "variance": "Wariancja (variance)",
-                "std_dev": "Odchylenie standardowe (std_dev)"
-            }[x]
-        )
+        if operation == "covariance":
+            metric2 = st.selectbox(
+                "Wybierz drugą metrykę do analizy (dla kowariancji):",
+                options=[col for col in all_columns if col != metric],
+                format_func=lambda x: f"{x}"
+            )
+            metric = f"{metric}/{metric2}"
+    
         url_filter=""
     
         st.write("Wybierz zakres wartości do analizy lub konkretne wartości dla metryk")
@@ -379,9 +389,15 @@ with tab_statystyki:
                     step=v_step, key=f"{label}_in_min")
             with c_max:
                 max_val_input = st.number_input( f"Do:", min_value=v_min, max_value=v_max, value=v_max,  step=v_step, key=f"{label}_in_max" )
-            if min_val_input == v_min and max_val_input == v_max:
+            if min_val_input>max_val_input:
+                st.warning(f"Uwaga: Wartość 'Od' ({min_val_input}) jest większa niż 'Do' ({max_val_input}). Proszę poprawić zakres.")
+                min_val_input, max_val_input = None, None
+            if min_val_input == v_min:
                 min_val_input = None
+            if max_val_input == v_max:
                 max_val_input = None
+            
+                min_val_input, max_val_input = None, None
         elif use_exact: 
             ex = st.number_input(f"Wartość {label}", min_value=v_min, max_value=v_max, value=v_min,  key=f"{label}_in", label_visibility="collapsed")
             if ex != v_min:
@@ -415,7 +431,10 @@ with tab_statystyki:
     url_filter = url_filter.rstrip("&")  
 
     st.divider()
-    target_url = f"{BACKEND_URL}/analyze/{metric}/{operation}?{url_filter}"
+    if operation == "covariance":
+        target_url = f"{BACKEND_URL}/{operation}/{metric}?{url_filter}"
+    else:
+        target_url = f"{BACKEND_URL}/analyze/{metric}/{operation}?{url_filter}"
     if st.button("Oblicz statystykę"):
         try:
             response = requests.get(target_url, params=params)
@@ -425,14 +444,20 @@ with tab_statystyki:
                 result = response.get(result_key, None)
                 rows_counted = response.get("rows_counted", 0)
 
-                if result is not None:
+                if rows_counted == 0:
+                    st.warning("⚠️ Brak danych. Żaden pacjent w bazie nie spełnia wybranych kryteriów filtrowania.")
+
+                elif result is not None:
                     st.success(f"### Wynik ({operation}) dla metryki **{metric}**: **{result:.2f}**")
                     st.info(f" Analiza została przeprowadzona na grupie **{rows_counted}** pacjentów spełniających kryteria.")
                 else:
                     st.error(f"Nie można znaleźć klucza '{result_key}' w odpowiedzi serwera.")
                     st.json(response)
             else:
-                st.error(f"Błąd serwera: {response.status_code}")
+                if response.status_code == 404:
+                    st.error("Brak danych do analizy. Żaden pacjent w bazie nie spełnia wybranych kryteriów filtrowania.")
+                else:
+                    st.error(f"Błąd serwera: {response.status_code}")
         except Exception as e:
             st.error(f"Błąd połączenia: {e}")
 
