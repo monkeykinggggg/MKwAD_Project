@@ -228,19 +228,18 @@ def analyze_metric(metric: str, operation: str, request: Request, db: Session = 
             query = query.filter(getattr(PatientResults, key) == val_float)
             filters_applied[key] = val_float
     results = query.all()
-    raw_data = [float(row[0]) for row in results if row[0] is not None]
-    if not raw_data:
-        raise HTTPException(status_code=404, detail="No data found.")
-
-    count = len(raw_data)
-    enc_vector = ts.ckks_vector(he_context, raw_data)
-    ser_data = base64.b64encode(enc_vector.serialize()).decode('utf-8')
+    result_data_from_db = [float(row[0]) for row in results if row[0] is not None]
+    if not result_data_from_db:
+        raise HTTPException(status_code=404, detail="No data found for the given metric and filters.")
+    count = len(result_data_from_db)
+    encrypted_vec = ts.ckks_vector(he_context, result_data_from_db)
+    serailized_data_vec = base64.b64encode(encrypted_vec.serialize()).decode('utf-8')
 
     try:
         operation_endpoint = operation if operation != "std_dev" else "variance"
         response = requests.post(
             f"{COMPUTATIONAL_URL}/{operation_endpoint}",
-            json={"data": ser_data, "count": count}
+            json={"data": serailized_data_vec, "count": count}
         )
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
@@ -263,16 +262,12 @@ def analyze_metric(metric: str, operation: str, request: Request, db: Session = 
 
 
 @app.get("/covariance/{metric_x}/{metric_y}")
-def analyze_bivariate(
-    metric_x: str, 
-    metric_y: str, 
-    request: Request, 
-    db: Session = Depends(get_db)
-):
+def analyze_bivariate( metric_x: str, metric_y: str, request: Request, db: Session = Depends(get_db)):
     valid_columns = PatientResults.__table__.columns.keys()
-    
-    if metric_x not in valid_columns or metric_y not in valid_columns:
-        raise HTTPException(status_code=400, detail="Invalid metric names.")
+    if  metric_x not in valid_columns:
+        raise HTTPException(status_code=400, detail=f"Invalid {metric_x=}")
+    if  metric_y not in valid_columns:
+        raise HTTPException(status_code=400, detail=f"Invalid {metric_y=}")
         
     query = db.query(getattr(PatientResults, metric_x), getattr(PatientResults, metric_y))
     filters_applied = {}
@@ -301,27 +296,17 @@ def analyze_bivariate(
             filters_applied[key] = val_float
 
     results = query.all()
-    clean_data = [
-        (float(row[0]), float(row[1])) 
-        for row in results 
-        if row[0] is not None and row[1] is not None
-    ]
-    
-    count = len(clean_data)
-    if count < 3: 
-        raise HTTPException(
-            status_code=403, 
-            detail="Privacy threshold not met. Filter too restrictive (returns fewer than 3 patients)."
-        )
+    result_data_from_db = [(float(row[0]), float(row[1])) for row in results if row[0] is not None and row[1] is not None]
+    if not result_data_from_db:
+        raise HTTPException(status_code=404, detail="No data found for the given metrics and filters.")
+    count = len(result_data_from_db)
 
-    raw_x = [row[0] for row in clean_data]
-    raw_y = [row[1] for row in clean_data]
-
+    raw_x = [row[0] for row in result_data_from_db]
+    raw_y = [row[1] for row in result_data_from_db]
     enc_x = ts.ckks_vector(he_context, raw_x)
     enc_y = ts.ckks_vector(he_context, raw_y)
     ser_x = base64.b64encode(enc_x.serialize()).decode('utf-8')
     ser_y = base64.b64encode(enc_y.serialize()).decode('utf-8')
-
     try:
         response = requests.post(
             f"{COMPUTATIONAL_URL}/covariance",
@@ -335,11 +320,12 @@ def analyze_bivariate(
     result_bytes = base64.b64decode(result_b64)
     result_enc = ts.ckks_vector_from(he_context, result_bytes)
     covariance_val = result_enc.decrypt()[0]
-    return {
+    response_payload = {
         "status": "Success",
         "metric_x": metric_x,
         "metric_y": metric_y,
         "rows_counted": count,
         "filters_applied": filters_applied,
-        "result_covariance": covariance_val
+        "result_covariance": covariance_val  
     }
+    return response_payload

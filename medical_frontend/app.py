@@ -4,7 +4,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Hospital Patient Viewer", layout="wide")
 st.title("🏥 Hospital Patient Viewer")
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = "http://localhost:8001"
 
 tab_glowna, tab_wyswietl,tab_szukaj, tab_dodaj, tab_statystyki = st.tabs(["🏠 Strona Główna","📖 Wyświetl Pacjentów", "🔍 Szukaj pacjenta", "➕ Dodaj Pacjenta", "📊 Statystyki"])
 
@@ -102,7 +102,7 @@ with tab_wyswietl:
                 df = df[df["sex"] == 0]
             elif wybrana_plec == "Mężczyźni":
                 df = df[df["sex"] == 1]
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width='stretch')
             st.success(f"Pomyślnie załadowano {len(df)} pacjentów.")
         else:
             st.error(f"Nie można pobrać danych. Serwer zwrócił błąd: {response.status_code}")

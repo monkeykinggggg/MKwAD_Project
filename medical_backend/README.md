@@ -6,7 +6,7 @@ After installing packages, start the lightweight server `uvicorn` via uv:
 ```bash
 uv run uvicorn medical_api:app --port 8001
 ```
-You can check all the endpoints in the browser in Swagger UI on `http://localhost:8000/docs`
+You can check all the endpoints in the browser in Swagger UI on http://localhost:8001/docs
 
 Database description:
 1. age
