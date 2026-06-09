@@ -440,9 +440,10 @@ with tab_statystyki:
             response = requests.get(target_url, params=params)
             if response.status_code == 200:
                 response = response.json()
-                result_key = f"result_{operation}"
-                result = response.get(result_key, None)
                 rows_counted = response.get("rows_counted", 0)
+
+                v_list = list(response.values())
+                result = v_list[-1] if v_list else None
 
                 if rows_counted == 0:
                     st.warning("⚠️ Brak danych. Żaden pacjent w bazie nie spełnia wybranych kryteriów filtrowania.")
@@ -451,7 +452,6 @@ with tab_statystyki:
                     st.success(f"### Wynik ({operation}) dla metryki **{metric}**: **{result:.2f}**")
                     st.info(f" Analiza została przeprowadzona na grupie **{rows_counted}** pacjentów spełniających kryteria.")
                 else:
-                    st.error(f"Nie można znaleźć klucza '{result_key}' w odpowiedzi serwera.")
                     st.json(response)
             else:
                 if response.status_code == 404:
