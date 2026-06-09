@@ -397,7 +397,6 @@ with tab_statystyki:
             if max_val_input == v_max:
                 max_val_input = None
             
-                min_val_input, max_val_input = None, None
         elif use_exact: 
             ex = st.number_input(f"Wartość {label}", min_value=v_min, max_value=v_max, value=v_min,  key=f"{label}_in", label_visibility="collapsed")
             if ex != v_min:
@@ -454,10 +453,10 @@ with tab_statystyki:
                 else:
                     st.json(response)
             else:
-                if response.status_code == 404:
-                    st.error("Brak danych do analizy. Żaden pacjent w bazie nie spełnia wybranych kryteriów filtrowania.")
-                else:
-                    st.error(f"Błąd serwera: {response.status_code}")
+                #if response.status_code == 404:
+                 #   st.error("Brak danych do analizy. Żaden pacjent w bazie nie spełnia wybranych kryteriów filtrowania.")
+               # else:
+                st.error(f"Błąd serwera: {response.status_code}")
         except Exception as e:
             st.error(f"Błąd połączenia: {e}")
 
