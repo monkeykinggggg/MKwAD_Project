@@ -33,7 +33,7 @@ def init_context(payload: ContextPayload):
         print("Successfully received and stored public HE context.")
         return {"status": "Success"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to load context: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to receive and load context: {e}")
 
 @app.post("/mean")
 def compute_mean_endpoint(payload: EncryptedPayload):
@@ -43,10 +43,9 @@ def compute_mean_endpoint(payload: EncryptedPayload):
     context = he_context_storage['public_context']
     vector_bytes = base64.b64decode(payload.data)
     
-    # Load vector and link to public context
     enc_vector = ts.ckks_vector_from(context, vector_bytes)
     result_enc = compute_he_mean(enc_vector, payload.count)
-    result_b64 = base64.b64encode(result_enc.serialize()).decode('utf-8')   # serializing and encoding 
+    result_b64 = base64.b64encode(result_enc.serialize()).decode('utf-8')
     return {"result": result_b64}
 
 @app.post("/variance")

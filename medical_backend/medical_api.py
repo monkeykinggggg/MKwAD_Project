@@ -25,7 +25,6 @@ he_context = ts.context(
     coeff_mod_bit_sizes=[60, 40, 40, 60]
 )
 he_context.global_scale = 2**40
-# Galois keys are required for the sum() operation on vectors
 he_context.generate_galois_keys()
 
 
@@ -123,7 +122,7 @@ async def lifespan(app: FastAPI):
         )
         print("Public context successfully shared with computational server.")
     except requests.exceptions.RequestException as e:
-        print(f"WARNING: Could not connect to computational server: {e}")    
+        print(f"Error during connecting to computational server: {e}")    
     finally:
         db.close()
     # The 'yield' pauses this function. FastAPI takes over here
@@ -148,7 +147,6 @@ def get_db():
     finally:
         db.close()
 
-# endpoints
 @app.get("/")
 def health():
     return "Medical Backend API"
