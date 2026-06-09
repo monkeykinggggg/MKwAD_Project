@@ -1,4 +1,8 @@
 # MKwAD_Project
+Authors:
+Joanna Hełdak,
+Amelia Nalborczyk,
+Szymon Nowak
 
 ## Confidential Medical Data Analysis with Fully Homomorphic Encryption
 Implementation of a system in which a hospital can outsource the computation of statistical indicators (e.g., mean, standard devation, covariance, and other aggregate statistics) on patient medical data to an external server — without revealing the raw data thanks to FHE. The computations were performed on the [Heart Disease Dataset]( https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset).
