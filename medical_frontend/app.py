@@ -436,6 +436,7 @@ with tab_statystyki:
         target_url = f"{BACKEND_URL}/analyze/{metric}/{operation}?{url_filter}"
     if st.button("Oblicz statystykę"):
         try:
+            print({"target_url": target_url})
             response = requests.get(target_url, params=params)
             if response.status_code == 200:
                 response = response.json()
