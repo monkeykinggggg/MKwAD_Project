@@ -1,10 +1,11 @@
 import requests
 import pandas as pd
 import streamlit as st
+import os
 
 st.set_page_config(page_title="Hospital Patient Viewer", layout="wide")
 st.title("🏥 Hospital Patient Viewer")
-BACKEND_URL = "http://localhost:8001"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8001")
 
 tab_glowna, tab_wyswietl,tab_szukaj, tab_dodaj, tab_statystyki = st.tabs(["🏠 Strona Główna","📖 Wyświetl Pacjentów", "🔍 Szukaj pacjenta", "➕ Dodaj Pacjenta", "📊 Statystyki"])
 

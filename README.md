@@ -44,9 +44,34 @@ The system uses the CKKS Fully Homomorphic Encryption (FHE) scheme implemented w
 | Development of the medical system, including: <br> • adding observations to the database <br> • submitting synamic client-side filtering queries allowing to construct complex, multi-variable queries (e.g., calculating the average value of a metric only for patients diagnosed with heart disease) | DONE |
 | Development of the computation service, communication with the medical service, and returning the appropriate results | DONE |
 
-## Running the Project
-To check on more detailed run isntructions from side of each server please refer to their README.md files.
-
+## How to Run
+If you have docker available, to start the system, you can simply run in the project root directory:
+```bash
+docker compose up
+```
+### Native Installation (Plan B)
+If Docker is unavailable or you prefer running the servers locally, you can use the uv package manager to spin up each service individually.  
+Navigate to the [computational_backend](./computational_backend) directory and run:
+```bash
+uv sync
+uv run uvicorn computational_api:app --port 8002
+# paste to run tests:
+uv run python -m unittest -v
+```
+To start the medical backend navigate to the [medical_backend](./medical_backend) directory and execute:
+```bash
+uv sync
+uv run uvicorn medical_api:app --port 8001
+```
+And finally start the frontend app in its directory:
+```bash
+uv sync
+uv run streamlit run app.py
+```
+Once all services are up and running, you can interact with the project through the following endpoints:
+- Frontend: http://localhost:8501
+- Medical Backend API Swagger UI : http://127.0.0.1:8001/docs
+- Computational Cloud API Swagger UI: http://127.0.0.1:8002/docs
 
 
 ## Technology Stack

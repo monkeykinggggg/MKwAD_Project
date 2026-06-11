@@ -10,8 +10,9 @@ from contextlib import asynccontextmanager
 from typing import List
 import requests
 import tenseal as ts
+import os
 
-COMPUTATIONAL_URL = "http://localhost:8002"
+COMPUTATIONAL_URL =os.getenv("COMPUTATIONAL_URL", "http://localhost:8002")
 
 engine = create_engine('sqlite:///medical.db', connect_args={"check_same_thread": False})
 # database session - preventing it from reloading every flush and commit
